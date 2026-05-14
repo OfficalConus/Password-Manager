@@ -1,0 +1,7 @@
+build/
+dist/
+__pycache__/
+*.pyc
+presentation.html
+presentation.pdf
+convert_to_pdf.py

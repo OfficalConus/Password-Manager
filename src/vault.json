@@ -1,0 +1,22 @@
+{
+  "salt": "zJgH/2mH0eZnofWNwhTPWQ==",
+  "master_hash": "b0a2aee84279b02e4d7f22d71cd46c6d668b50dba660cea3488f558fce6922ee",
+  "passwords": [
+    {
+      "label": "Github",
+      "password": "iJusUj+j95G5w4yvYSsk87b0JsiJ7J4=",
+      "date": "2026-05-10 12:43"
+    },
+    {
+      "label": "Gitlab",
+      "password": "cgeZqqE+slONhhU9ivBu9KLlO37bJdhYWZ2ZN8EX//k=",
+      "date": "2026-05-10 12:43"
+    }
+  ],
+  "totp": [
+    {
+      "label": "1",
+      "secret": "ops87Ga60q0Gcb3agXCTt7Abn6fTiy+k"
+    }
+  ]
+}
