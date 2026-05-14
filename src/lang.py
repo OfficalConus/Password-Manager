@@ -1,4 +1,4 @@
-_lang = "RU"
+_lang = "EN"
 
 SUPPORTED = {"RU": "Русский", "EN": "English", "ZH": "中文"}
 
