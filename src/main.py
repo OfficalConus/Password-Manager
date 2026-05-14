@@ -67,8 +67,10 @@ class PasswordApp:
             ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
             GWL_EXSTYLE = -20
             WS_EX_APPWINDOW = 0x00040000
+            WS_EX_TOOLWINDOW = 0x00000080
             ex = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_APPWINDOW)
+            ex = (ex & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
             SWP_FRAMECHANGED = 0x0020
             SWP_NOMOVE = 0x0002
             SWP_NOSIZE = 0x0001
@@ -76,6 +78,11 @@ class PasswordApp:
             SWP_SHOWWINDOW = 0x0040
             ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
                 SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW)
+            dwmapi = ctypes.windll.dwmapi
+            DWMWA_NCRENDERING_POLICY = 2
+            DWMNCRP_DISABLED = 1
+            dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY,
+                ctypes.byref(ctypes.c_int(DWMNCRP_DISABLED)), 4)
         except Exception:
             pass
 
