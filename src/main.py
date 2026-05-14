@@ -20,6 +20,7 @@ AUTO_LOCK_MS = 120_000
 class PasswordApp:
     def __init__(self, root):
         self.root = root
+        self.root.overrideredirect(True)
         self.root.geometry("840x540+100+100")
         self.root.title("Password Manager")
         self.root.configure(bg=W95_BG)
@@ -41,36 +42,17 @@ class PasswordApp:
         self.auto_lock_id = None
 
         self.root.bind("<Map>", self._on_map)
-        self._strip_titlebar()
         self.setup_styles()
         self.create_border()
         self.create_title_bar()
         self.setup_ui()
 
+        self.root.after(50, self._fix_taskbar)
         self.root.after(200, self.startup_unlock)
 
-    def _strip_titlebar(self, widget=None):
+    def _fix_taskbar(self):
         try:
-            hwnd = wintypes.HWND((widget or self.root).winfo_id())
-            GWL_STYLE = -16
-            WS_POPUP = 0x80000000
-            WS_BORDER = 0x00800000
-            WS_CAPTION = 0x00C00000
-            WS_THICKFRAME = 0x00040000
-            WS_MINIMIZEBOX = 0x00020000
-            WS_MAXIMIZEBOX = 0x00010000
-            WS_SYSMENU = 0x00080000
-            WS_DLGFRAME = 0x00400000
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
-            style = (style & ~(WS_BORDER | WS_CAPTION | WS_THICKFRAME |
-                               WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_DLGFRAME)) | WS_POPUP
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
-            GWL_EXSTYLE = -20
-            WS_EX_APPWINDOW = 0x00040000
-            WS_EX_TOOLWINDOW = 0x00000080
-            ex = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            ex = (ex & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
+            hwnd = wintypes.HWND(self.root.winfo_id())
             SWP_FRAMECHANGED = 0x0020
             SWP_NOMOVE = 0x0002
             SWP_NOSIZE = 0x0001
@@ -241,6 +223,7 @@ class PasswordApp:
         self.root.geometry(f"+{self.win_pos[0] + dx}+{self.win_pos[1] + dy}")
 
     def _iconify(self):
+        self.root.overrideredirect(False)
         self.root.iconify()
 
     def _on_map(self, event):
@@ -251,8 +234,9 @@ class PasswordApp:
     def _restore_override(self):
         try:
             if self.root.wm_state() == "normal":
+                self.root.overrideredirect(True)
                 self._redraw_title()
-                self.root.after(10, self._strip_titlebar)
+                self.root.after(10, self._fix_taskbar)
         except Exception:
             pass
 
@@ -413,7 +397,7 @@ class PasswordApp:
         win.geometry("350x250")
         win.configure(bg=W95_BG)
         win.resizable(False, False)
-        self.root.after(50, lambda: self._strip_titlebar(win))
+        self.root.after(50, lambda: self._fix_taskbar())
 
         tk.Label(win, text=tr("mp_current"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(12, 2))
         cur_var = tk.StringVar()
@@ -485,7 +469,7 @@ class PasswordApp:
         win = tk.Toplevel(self.root)
         win.configure(bg=W95_BG)
         win.resizable(False, False)
-        self.root.after(50, lambda: self._strip_titlebar(win))
+        self.root.after(50, lambda: self._fix_taskbar())
 
         first_run = not self.vault_exists()
 
