@@ -2,9 +2,13 @@
 
 A Windows 95-styled password manager with password generation, encrypted vault storage, and TOTP two-factor authentication.
 
-<img src="src/1.png" width="280">
-<img src="src/2.png" width="280">
-<img src="src/3.png" width="280">
+<p>
+  <img src="src/1.png" width="380">
+  <img src="src/2.png" width="380">
+</p>
+<p>
+  <img src="src/3.png" width="380">
+</p>
 
 ## Features
 
