@@ -7,7 +7,6 @@ from .lang import tr
 from .crypto import derive_key, encrypt_data, decrypt_data
 
 NOTE_FILE = os.path.join(VAULT_DIR, "notes.enc")
-SALT_FILE = os.path.join(VAULT_DIR, "notes.salt")
 
 
 class NotepadTab:
