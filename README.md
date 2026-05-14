@@ -6,10 +6,8 @@ A Windows 95-styled password manager with password generation, encrypted vault s
   <img src="src/1.png" width="380">
   <img src="src/2.png" width="380">
 </p>
-<p align="center">
+<p>
   <img src="src/3.png" width="380">
-</p>
-<p align="center">
   <img src="src/4.png" width="380">
 </p>
 
@@ -18,6 +16,7 @@ A Windows 95-styled password manager with password generation, encrypted vault s
 - **Password Generator** — configurable length, character sets, strength indicator
 - **Encrypted Vault** — AES-256-GCM encrypted local storage with master password
 - **TOTP/2FA** — Time-based one-time password codes with countdown timer
+- **Encrypted Notes** — Built-in notepad for recovery codes, encrypted with master password
 - **Win95 UI** — Custom-drawn title bar, borders, and 3D buttons
 - **Auto-Lock** — Vault locks after 2 minutes of inactivity
 - **Multi-language** — Russian, English, Chinese
