@@ -1,7 +1,9 @@
 build/
 dist/
+session-*.md
 __pycache__/
 *.pyc
 presentation.html
 presentation.pdf
 convert_to_pdf.py
+session-ses_1d80.md

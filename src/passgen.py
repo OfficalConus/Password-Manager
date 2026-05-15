@@ -5,6 +5,7 @@ from datetime import datetime
 from .constants import CHAR_SETS, CHAR_ORDER, W95_BG, W95_FG, W95_BTN, W95_INPUT, W95_SH, FONT, FONT_BOLD, FONT_SM, FONT_LG, FONT_XL, FONT_MONO
 from .utils import calculate_strength
 from .lang import tr, tr_char
+from .win95_dialog import Win95Dialog
 
 
 class GeneratorTab:
@@ -156,18 +157,15 @@ class GeneratorTab:
             if not self.app.prompt_unlock():
                 return
 
-        win = tk.Toplevel(self.app.root)
-        win.title(tr("gen_save"))
-        win.geometry("350x160")
-        win.configure(bg=W95_BG)
-        win.resizable(False, False)
-        tk.Label(win, text=tr("gen_save_title"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(15, 5))
+        dlg = Win95Dialog(self.app.root, tr("gen_save"), 350, 160, app=self.app)
+        body = dlg.body
+        tk.Label(body, text=tr("gen_save_title"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(15, 5))
         var = tk.StringVar()
-        tk.Entry(win, textvariable=var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(pady=5, ipady=4, padx=20, fill=tk.X)
-        tk.Button(win, text=tr("gen_save_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, cursor="hand2",
-                  command=lambda: self._do_save(var.get(), pwd, win)).pack(pady=10)
+        tk.Entry(body, textvariable=var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(pady=5, ipady=4, padx=20, fill=tk.X)
+        tk.Button(body, text=tr("gen_save_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, cursor="hand2",
+                  command=lambda: self._do_save(var.get(), pwd, dlg)).pack(pady=10)
 
-    def _do_save(self, label, pwd, win):
+    def _do_save(self, label, pwd, dlg):
         if not label.strip():
             messagebox.showwarning(tr("error"), tr("gen_no_name"))
             return
@@ -179,5 +177,5 @@ class GeneratorTab:
         self.app.save_vault()
         if self.app.vault_tab:
             self.app.vault_tab.refresh_list()
-        win.destroy()
+        dlg.close()
         messagebox.showinfo(tr("ready"), tr("gen_saved"))

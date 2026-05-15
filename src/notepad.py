@@ -5,6 +5,7 @@ import base64
 from .constants import VAULT_DIR, W95_BG, W95_FG, W95_BTN, W95_INPUT, W95_SH, FONT, FONT_BOLD, FONT_SM, FONT_MONO
 from .lang import tr
 from .crypto import derive_key, encrypt_data, decrypt_data
+from .vault_ui import clear_children, show_vault_locked
 
 NOTE_FILE = os.path.join(VAULT_DIR, "notes.enc")
 
@@ -22,11 +23,28 @@ class NotepadTab:
         tk.Label(f, text=tr("notes_title"), font=("Terminal", 16, "bold"),
                  bg=W95_BG, fg=W95_FG).pack(pady=(0, 10))
 
-        self.text = tk.Text(f, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG,
-                             relief=tk.SUNKEN, bd=2, wrap=tk.WORD, undo=True)
+        self.content_area = tk.Frame(f, bg=W95_BG)
+        self.content_area.pack(fill=tk.BOTH, expand=True)
+
+        self.refresh()
+
+    def refresh(self):
+        if self.app.vault_unlocked:
+            self.unlocked_view()
+        else:
+            self.locked_view()
+
+    def locked_view(self):
+        show_vault_locked(self.content_area)
+
+    def unlocked_view(self):
+        clear_children(self.content_area)
+
+        self.text = tk.Text(self.content_area, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG,
+                            relief=tk.SUNKEN, bd=2, wrap=tk.WORD, undo=True)
         self.text.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
 
-        btnf = tk.Frame(f, bg=W95_BG)
+        btnf = tk.Frame(self.content_area, bg=W95_BG)
         btnf.pack(fill=tk.X)
 
         tk.Button(btnf, text=tr("notes_save"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
@@ -36,7 +54,7 @@ class NotepadTab:
         tk.Button(btnf, text=tr("notes_clear"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
                   relief=tk.RAISED, bd=2, command=self.clear_notes).pack(side=tk.LEFT, padx=2)
 
-        self.status = tk.Label(f, text="", font=FONT_SM, bg=W95_BG, fg=W95_SH)
+        self.status = tk.Label(self.content_area, text="", font=FONT_SM, bg=W95_BG, fg=W95_SH)
         self.status.pack()
 
         self.load_notes()
@@ -48,10 +66,8 @@ class NotepadTab:
         return derive_key(self.app.master_password, salt)
 
     def save_notes(self):
-        if not self.app.master_password:
-            if not self.app.prompt_unlock():
-                messagebox.showwarning(tr("error"), tr("notes_locked"))
-                return
+        if not self.app.vault_unlocked:
+            return
         key = self._get_key()
         if not key:
             return
@@ -67,7 +83,7 @@ class NotepadTab:
     def load_notes(self):
         if not os.path.exists(NOTE_FILE):
             return
-        if not self.app.master_password:
+        if not self.app.vault_unlocked:
             return
         key = self._get_key()
         if not key:

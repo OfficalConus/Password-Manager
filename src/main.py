@@ -15,8 +15,14 @@ from .twofa import TOTPTab
 from .notepad import NotepadTab
 from .email_tab import EmailTab
 from .lang import tr, set_lang, get_lang, SUPPORTED
+from .win95_dialog import Win95Dialog
+from .title_bar_util import bind_title_drag
 
 AUTO_LOCK_MS = 120_000
+
+GWL_EXSTYLE = -20
+WS_EX_APPWINDOW = 0x00040000
+WS_EX_TOOLWINDOW = 0x00000080
 
 
 class PasswordApp:
@@ -42,6 +48,7 @@ class PasswordApp:
         self.master_password = ""
         self.vault_tab = None
         self.auto_lock_id = None
+        self._pending_restore = False
 
         self.root.bind("<Map>", self._on_map)
         self.setup_styles()
@@ -49,19 +56,48 @@ class PasswordApp:
         self.create_title_bar()
         self.setup_ui()
 
-        self.root.after(50, self._fix_taskbar)
+        try:
+            self.root.attributes("-toolwindow", False)
+        except tk.TclError:
+            pass
+        self.root.after(100, lambda: self._fix_taskbar(self.root))
         self.root.after(200, self.startup_unlock)
 
-    def _fix_taskbar(self):
+    def _top_hwnd(self, widget):
+        hwnd = widget.winfo_id()
+        parent = ctypes.windll.user32.GetParent(hwnd)
+        return parent if parent else hwnd
+
+    def _get_window_long(self, hwnd, index):
+        if ctypes.sizeof(ctypes.c_void_p) == 8:
+            return ctypes.windll.user32.GetWindowLongPtrW(hwnd, index)
+        return ctypes.windll.user32.GetWindowLongW(hwnd, index)
+
+    def _set_window_long(self, hwnd, index, value):
+        if ctypes.sizeof(ctypes.c_void_p) == 8:
+            return ctypes.windll.user32.SetWindowLongPtrW(hwnd, index, value)
+        return ctypes.windll.user32.SetWindowLongW(hwnd, index, value)
+
+    def _fix_taskbar(self, widget=None):
+        if sys.platform != "win32":
+            return
+        widget = widget or self.root
         try:
-            hwnd = wintypes.HWND(self.root.winfo_id())
+            widget.update_idletasks()
+            hwnd = self._top_hwnd(widget)
+            style = self._get_window_long(hwnd, GWL_EXSTYLE)
+            style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+            self._set_window_long(hwnd, GWL_EXSTYLE, style)
+
             SWP_FRAMECHANGED = 0x0020
             SWP_NOMOVE = 0x0002
             SWP_NOSIZE = 0x0001
             SWP_NOZORDER = 0x0004
             SWP_SHOWWINDOW = 0x0040
-            ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW)
+            ctypes.windll.user32.SetWindowPos(
+                hwnd, 0, 0, 0, 0, 0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW,
+            )
         except Exception:
             pass
 
@@ -159,8 +195,9 @@ class PasswordApp:
         self.tc = tk.Canvas(self.title_bar, height=26, highlightthickness=0, bg="#000080")
         self.tc.pack(fill=tk.BOTH, expand=True)
         self.tc.bind("<Configure>", self._redraw_title)
-        self.tc.bind("<Button-1>", self._title_click)
-        self.tc.bind("<B1-Motion>", self._drag_win)
+        bind_title_drag(self.tc, self._title_click, self._drag_win)
+        self.title_bar.bind("<Button-1>", self._title_click)
+        self.title_bar.bind("<B1-Motion>", self._drag_win)
 
     def _redraw_title(self, event=None):
         self.tc.delete("all")
@@ -194,6 +231,8 @@ class PasswordApp:
         self._win95_btn(nx, by, bw, bh, "_")
         self._btn_rects.append((nx, by, nx + bw, by + bh, self._iconify))
 
+        bind_title_drag(self.tc, self._title_click, self._drag_win)
+
     def _win95_btn(self, x, y, w, h, text, close=False):
         # 1. Main body
         self.tc.create_rectangle(x, y, x + w, y + h, fill="#C0C0C0", outline="")
@@ -220,25 +259,30 @@ class PasswordApp:
         self.win_pos = (self.root.winfo_x(), self.root.winfo_y())
 
     def _drag_win(self, ev):
+        if self.is_maxed:
+            return
         dx = ev.x_root - self.drag_start[0]
         dy = ev.y_root - self.drag_start[1]
         self.root.geometry(f"+{self.win_pos[0] + dx}+{self.win_pos[1] + dy}")
 
     def _iconify(self):
+        self._pending_restore = True
         self.root.overrideredirect(False)
         self.root.iconify()
 
     def _on_map(self, event):
-        if event.widget != self.root:
+        if event.widget != self.root or not self._pending_restore:
             return
+        if self.root.wm_state() != "normal":
+            return
+        self._pending_restore = False
         self.root.after(10, self._restore_override)
 
     def _restore_override(self):
         try:
-            if self.root.wm_state() == "normal":
-                self.root.overrideredirect(True)
-                self._redraw_title()
-                self.root.after(10, self._fix_taskbar)
+            self.root.overrideredirect(True)
+            self._redraw_title()
+            self.root.after(10, lambda: self._fix_taskbar(self.root))
         except Exception:
             pass
 
@@ -294,6 +338,7 @@ class PasswordApp:
 
         self.vault_tab = vault_tab
         self.totp_tab = totp_tab
+        self.notes_tab = notes_tab
 
         self.notebook.add(gen_tab.frame, text=f"  {tr('tab_gen')}  ")
         self.notebook.add(vault_tab.frame, text=f"  {tr('tab_vault')}  ")
@@ -302,8 +347,12 @@ class PasswordApp:
         self.notebook.add(email_tab.frame, text=f"  {tr('tab_email')}  ")
 
     def startup_unlock(self):
-        if self.vault_exists():
+        self.root.update_idletasks()
+        self.root.lift()
+        self.root.focus_force()
+        if not self.vault_unlocked:
             self.prompt_unlock()
+        self.root.after(50, lambda: self._fix_taskbar(self.root))
 
     def reset_auto_lock(self):
         if self.auto_lock_id:
@@ -398,24 +447,20 @@ class PasswordApp:
     def change_master_password(self):
         if not self.vault_unlocked:
             return
-        win = tk.Toplevel(self.root)
-        win.title(tr("mp_change_title"))
-        win.geometry("350x250")
-        win.configure(bg=W95_BG)
-        win.resizable(False, False)
-        self.root.after(50, lambda: self._fix_taskbar())
+        dlg = Win95Dialog(self.root, tr("mp_change_title"), 350, 250, app=self)
+        body = dlg.body
 
-        tk.Label(win, text=tr("mp_current"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(12, 2))
+        tk.Label(body, text=tr("mp_current"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(12, 2))
         cur_var = tk.StringVar()
-        tk.Entry(win, textvariable=cur_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
+        tk.Entry(body, textvariable=cur_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
 
-        tk.Label(win, text=tr("mp_new"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
+        tk.Label(body, text=tr("mp_new"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
         new_var = tk.StringVar()
-        tk.Entry(win, textvariable=new_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
+        tk.Entry(body, textvariable=new_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
 
-        tk.Label(win, text=tr("mp_repeat"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
+        tk.Label(body, text=tr("mp_repeat"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
         rep_var = tk.StringVar()
-        tk.Entry(win, textvariable=rep_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
+        tk.Entry(body, textvariable=rep_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=25, fill=tk.X)
 
         def confirm():
             cur = cur_var.get()
@@ -435,10 +480,10 @@ class PasswordApp:
                 return
             self.master_password = new
             self.save_vault()
-            win.destroy()
+            dlg.close()
             messagebox.showinfo(tr("ready"), tr("mp_changed"))
 
-        tk.Button(win, text=tr("mp_change_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, command=confirm).pack(pady=12)
+        tk.Button(body, text=tr("mp_change_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, command=confirm).pack(pady=12)
 
     def reset_vault(self):
         if not messagebox.askyesno(
@@ -454,9 +499,16 @@ class PasswordApp:
         if self.auto_lock_id:
             self.root.after_cancel(self.auto_lock_id)
             self.auto_lock_id = None
+        self._refresh_vault_tabs()
+        messagebox.showinfo(tr("ready"), tr("reset_done"))
+
+    def _refresh_vault_tabs(self):
         if self.vault_tab:
             self.vault_tab.refresh()
-        messagebox.showinfo(tr("ready"), tr("reset_done"))
+        if self.notes_tab:
+            self.notes_tab.refresh()
+        if self.totp_tab:
+            self.totp_tab.refresh()
 
     def lock_vault(self):
         self.vault_unlocked = False
@@ -464,34 +516,23 @@ class PasswordApp:
         if self.auto_lock_id:
             self.root.after_cancel(self.auto_lock_id)
             self.auto_lock_id = None
-        if self.vault_tab:
-            self.vault_tab.refresh()
+        self._refresh_vault_tabs()
 
     def prompt_unlock(self):
         if self.vault_unlocked:
             self.reset_auto_lock()
             return True
 
-        win = tk.Toplevel(self.root)
-        win.configure(bg=W95_BG)
-        win.resizable(False, False)
-        self.root.after(50, lambda: self._fix_taskbar())
-
         first_run = not self.vault_exists()
+        title = tr("unlock_title_set") if first_run else tr("unlock_title_in")
+        dlg = Win95Dialog(self.root, title, 350, 190, app=self)
+        body = dlg.body
 
-        if first_run:
-            win.title(tr("unlock_title_set"))
-            win.geometry("350x190")
-            tk.Label(win, text=tr("unlock_desc_set"),
-                     font=FONT, bg=W95_BG, fg=W95_FG, justify=tk.CENTER).pack(pady=(15, 10))
-        else:
-            win.title(tr("unlock_title_in"))
-            win.geometry("350x190")
-            tk.Label(win, text=tr("unlock_desc_in"),
-                     font=FONT, bg=W95_BG, fg=W95_FG, justify=tk.CENTER).pack(pady=(15, 10))
+        desc = tr("unlock_desc_set") if first_run else tr("unlock_desc_in")
+        tk.Label(body, text=desc, font=FONT, bg=W95_BG, fg=W95_FG, justify=tk.CENTER).pack(pady=(15, 10))
 
         pwd_var = tk.StringVar()
-        entry = tk.Entry(win, textvariable=pwd_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2)
+        entry = tk.Entry(body, textvariable=pwd_var, show="*", font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2)
         entry.pack(pady=5, ipady=4, padx=20, fill=tk.X)
 
         result = [False]
@@ -505,25 +546,23 @@ class PasswordApp:
                 self.vault_unlocked = True
                 self.vault_data = {"passwords": [], "totp": []}
                 result[0] = True
-                win.destroy()
-                if self.vault_tab:
-                    self.vault_tab.refresh()
+                dlg.close()
+                self._refresh_vault_tabs()
                 self.reset_auto_lock()
             elif self.decrypt_vault(p):
                 self.master_password = p
                 self.vault_unlocked = True
                 result[0] = True
-                win.destroy()
-                if self.vault_tab:
-                    self.vault_tab.refresh()
+                dlg.close()
+                self._refresh_vault_tabs()
                 self.reset_auto_lock()
             else:
                 messagebox.showerror(tr("error"), tr("unlock_wrong"))
 
         btn_text = tr("unlock_btn_set") if first_run else tr("unlock_btn_in")
-        tk.Button(win, text=btn_text, font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, command=confirm).pack(pady=10)
+        tk.Button(body, text=btn_text, font=FONT_BOLD, bg=W95_BTN, fg=W95_FG, relief=tk.RAISED, bd=2, command=confirm).pack(pady=10)
 
         entry.bind("<Return>", lambda e: confirm())
         entry.focus()
-        self.root.wait_window(win)
+        dlg.wait()
         return result[0]

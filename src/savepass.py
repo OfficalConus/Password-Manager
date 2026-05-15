@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from .constants import W95_BG, W95_FG, W95_BTN, W95_INPUT, W95_SH, FONT, FONT_BOLD, FONT_SM, FONT_MONO
 from .lang import tr
+from .vault_ui import show_vault_locked
+from .win95_dialog import Win95Dialog
 
 
 class VaultTab:
@@ -27,11 +29,7 @@ class VaultTab:
             w.destroy()
 
     def locked_view(self):
-        self.clear_content()
-        tk.Label(self.content_area, text=tr("vault_locked_title"),
-                 font=("Terminal", 14, "bold"), bg=W95_BG, fg=W95_SH).pack(pady=(40, 10))
-        tk.Label(self.content_area, text=tr("vault_locked_desc"),
-                 font=FONT, bg=W95_BG, fg=W95_SH, justify=tk.CENTER).pack()
+        show_vault_locked(self.content_area)
 
     def unlocked_view(self):
         self.clear_content()
@@ -92,19 +90,16 @@ class VaultTab:
         messagebox.showinfo(tr("ready"), tr("vault_copied"))
 
     def add_password(self):
-        win = tk.Toplevel(self.app.root)
-        win.title(tr("vault_add_title"))
-        win.geometry("400x220")
-        win.configure(bg=W95_BG)
-        win.resizable(False, False)
+        dlg = Win95Dialog(self.app.root, tr("vault_add_title"), 400, 220, app=self.app)
+        body = dlg.body
 
-        tk.Label(win, text=tr("vault_add_label"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(10, 2))
+        tk.Label(body, text=tr("vault_add_label"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(10, 2))
         label_var = tk.StringVar()
-        tk.Entry(win, textvariable=label_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
+        tk.Entry(body, textvariable=label_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
 
-        tk.Label(win, text=tr("vault_add_pwd"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
+        tk.Label(body, text=tr("vault_add_pwd"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
         pwd_var = tk.StringVar()
-        tk.Entry(win, textvariable=pwd_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
+        tk.Entry(body, textvariable=pwd_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
 
         def save_new():
             label = label_var.get().strip()
@@ -119,10 +114,10 @@ class VaultTab:
             })
             self.app.save_vault()
             self.refresh_list()
-            win.destroy()
+            dlg.close()
             messagebox.showinfo(tr("ready"), tr("vault_added"))
 
-        tk.Button(win, text=tr("vault_add_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
+        tk.Button(body, text=tr("vault_add_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
                   relief=tk.RAISED, bd=2, cursor="hand2", command=save_new).pack(pady=12)
 
     def edit_password(self):
@@ -131,19 +126,16 @@ class VaultTab:
             return
         item = self.app.vault_data["passwords"][idx]
 
-        win = tk.Toplevel(self.app.root)
-        win.title(tr("vault_edit_title"))
-        win.geometry("400x220")
-        win.configure(bg=W95_BG)
-        win.resizable(False, False)
+        dlg = Win95Dialog(self.app.root, tr("vault_edit_title"), 400, 220, app=self.app)
+        body = dlg.body
 
-        tk.Label(win, text=tr("vault_edit_label"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(10, 2))
+        tk.Label(body, text=tr("vault_edit_label"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(10, 2))
         label_var = tk.StringVar(value=item["label"])
-        tk.Entry(win, textvariable=label_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
+        tk.Entry(body, textvariable=label_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
 
-        tk.Label(win, text=tr("vault_edit_pwd"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
+        tk.Label(body, text=tr("vault_edit_pwd"), font=FONT, bg=W95_BG, fg=W95_FG).pack(pady=(8, 2))
         pwd_var = tk.StringVar(value=item["password"])
-        tk.Entry(win, textvariable=pwd_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
+        tk.Entry(body, textvariable=pwd_var, font=FONT_MONO, bg=W95_INPUT, fg=W95_FG, relief=tk.SUNKEN, bd=2).pack(ipady=3, padx=20, fill=tk.X)
 
         def save_edit():
             new_label = label_var.get().strip()
@@ -157,10 +149,10 @@ class VaultTab:
             self.app.vault_data["passwords"][idx]["date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
             self.app.save_vault()
             self.refresh_list()
-            win.destroy()
+            dlg.close()
             messagebox.showinfo(tr("ready"), tr("vault_edited"))
 
-        tk.Button(win, text=tr("vault_edit_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
+        tk.Button(body, text=tr("vault_edit_btn"), font=FONT_BOLD, bg=W95_BTN, fg=W95_FG,
                   relief=tk.RAISED, bd=2, cursor="hand2", command=save_edit).pack(pady=12)
 
     def delete_password(self):
@@ -191,7 +183,6 @@ class VaultTab:
 
     def lock(self):
         self.app.lock_vault()
-        self.locked_view()
 
     def refresh(self):
         if self.app.vault_unlocked:

@@ -4,6 +4,7 @@ import base64
 from .crypto import totp, totp_remaining
 from .constants import W95_BG, W95_FG, W95_BTN, W95_INPUT, W95_SH, FONT, FONT_BOLD, FONT_SM, FONT_MONO
 from .lang import tr
+from .vault_ui import clear_children, show_vault_locked
 
 
 class TOTPTab:
@@ -26,7 +27,29 @@ class TOTPTab:
         tk.Label(f, text=tr("totp_title"),
                  font=("Terminal", 16, "bold"), bg=W95_BG, fg=W95_FG).pack(pady=(0, 10))
 
-        af = tk.LabelFrame(f, text=tr("totp_add_key"), font=FONT, bg=W95_BG, fg=W95_FG, padx=10, pady=8, relief=tk.GROOVE, bd=2)
+        self.content_area = tk.Frame(f, bg=W95_BG)
+        self.content_area.pack(fill=tk.BOTH, expand=True)
+
+        self.refresh()
+
+    def refresh(self):
+        if not self.app.vault_unlocked:
+            if self.refresh_id:
+                self.app.root.after_cancel(self.refresh_id)
+                self.refresh_id = None
+            show_vault_locked(self.content_area)
+            return
+
+        if not hasattr(self, "inner") or not self.inner.winfo_exists():
+            self.unlocked_view()
+
+        self._update_codes()
+
+    def unlocked_view(self):
+        clear_children(self.content_area)
+
+        af = tk.LabelFrame(self.content_area, text=tr("totp_add_key"), font=FONT, bg=W95_BG, fg=W95_FG,
+                           padx=10, pady=8, relief=tk.GROOVE, bd=2)
         af.pack(fill=tk.X, pady=5)
 
         row1 = tk.Frame(af, bg=W95_BG)
@@ -45,7 +68,7 @@ class TOTPTab:
                   relief=tk.RAISED, bd=2, cursor="hand2",
                   command=self.add_key).pack(pady=5)
 
-        self.canvas = tk.Canvas(f, bg=W95_INPUT, relief=tk.SUNKEN, bd=2, highlightthickness=0)
+        self.canvas = tk.Canvas(self.content_area, bg=W95_INPUT, relief=tk.SUNKEN, bd=2, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True, pady=8)
         scroll = tk.Scrollbar(self.canvas, orient=tk.VERTICAL, command=self.canvas.yview)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -57,38 +80,13 @@ class TOTPTab:
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         self.inner.bind("<Configure>", _conf)
 
-        self.timer_label = tk.Label(f, text="", font=FONT, bg=W95_BG, fg=W95_SH)
+        self.timer_label = tk.Label(self.content_area, text="", font=FONT, bg=W95_BG, fg=W95_SH)
         self.timer_label.pack()
 
-        self.countdown_bar = ttk.Progressbar(f, mode="determinate", length=300)
+        self.countdown_bar = ttk.Progressbar(self.content_area, mode="determinate", length=300)
         self.countdown_bar.pack(pady=2)
 
-        self.refresh()
-
-    def add_key(self):
-        label = self.label_ent.get().strip()
-        secret = self.secret_ent.get().strip()
-        if not label or not secret:
-            messagebox.showwarning(tr("error"), tr("fill_all"))
-            return
-        try:
-            base64.b32decode(secret.upper())
-        except Exception:
-            messagebox.showerror(tr("error"), tr("totp_invalid_secret"))
-            return
-        if not self.app.vault_unlocked:
-            if not self.app.prompt_unlock():
-                return
-        self.app.vault_data.setdefault("totp", []).append({
-            "label": label,
-            "secret": secret.upper()
-        })
-        self.app.save_vault()
-        self.label_ent.delete(0, tk.END)
-        self.secret_ent.delete(0, tk.END)
-        self.refresh()
-
-    def refresh(self):
+    def _update_codes(self):
         try:
             for w in self.inner.winfo_children():
                 w.destroy()
@@ -139,6 +137,28 @@ class TOTPTab:
             self.refresh_id = self.app.root.after(1000, self.refresh)
         except tk.TclError:
             self.refresh_id = None
+
+    def add_key(self):
+        if not self.app.vault_unlocked:
+            return
+        label = self.label_ent.get().strip()
+        secret = self.secret_ent.get().strip()
+        if not label or not secret:
+            messagebox.showwarning(tr("error"), tr("fill_all"))
+            return
+        try:
+            base64.b32decode(secret.upper())
+        except Exception:
+            messagebox.showerror(tr("error"), tr("totp_invalid_secret"))
+            return
+        self.app.vault_data.setdefault("totp", []).append({
+            "label": label,
+            "secret": secret.upper()
+        })
+        self.app.save_vault()
+        self.label_ent.delete(0, tk.END)
+        self.secret_ent.delete(0, tk.END)
+        self.refresh()
 
     def delete_key(self, idx):
         item = self.app.vault_data["totp"][idx]
