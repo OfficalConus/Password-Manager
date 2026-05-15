@@ -5,6 +5,7 @@ from .crypto import totp, totp_remaining
 from .constants import W95_BG, W95_FG, W95_BTN, W95_INPUT, W95_SH, FONT, FONT_BOLD, FONT_SM, FONT_MONO
 from .lang import tr
 from .vault_ui import clear_children, show_vault_locked
+from .tk_layout import Progressbar95Game
 
 
 class TOTPTab:
@@ -12,6 +13,7 @@ class TOTPTab:
         self.app = app
         self.frame = tk.Frame(parent, bg=W95_BG)
         self.refresh_id = None
+        self.game = None
         self.build()
 
     def build(self):
@@ -32,7 +34,27 @@ class TOTPTab:
 
         self.refresh()
 
+    def show_game(self):
+        if self.refresh_id:
+            self.app.root.after_cancel(self.refresh_id)
+            self.refresh_id = None
+        self.stop_game()
+        clear_children(self.content_area)
+        self.game = Progressbar95Game(self.content_area, self)
+
+    def stop_game(self):
+        if self.game:
+            self.game.destroy()
+            self.game = None
+
     def refresh(self):
+        if getattr(self.app, "easter_game_mode", False):
+            if not self.game or not self.game.frame.winfo_exists():
+                self.show_game()
+            return
+
+        self.stop_game()
+
         if not self.app.vault_unlocked:
             if self.refresh_id:
                 self.app.root.after_cancel(self.refresh_id)

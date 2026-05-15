@@ -17,6 +17,7 @@ from .email_tab import EmailTab
 from .lang import tr, set_lang, get_lang, SUPPORTED
 from .win95_dialog import Win95Dialog
 from .title_bar_util import bind_title_drag
+from .tk_layout import EGG_CLICKS, EGG_CLICK_RESET_MS, show_pin_dialog
 
 AUTO_LOCK_MS = 120_000
 
@@ -49,6 +50,9 @@ class PasswordApp:
         self.vault_tab = None
         self.auto_lock_id = None
         self._pending_restore = False
+        self.egg_clicks = 0
+        self.egg_click_job = None
+        self.easter_game_mode = False
 
         self.root.bind("<Map>", self._on_map)
         self.setup_styles()
@@ -302,8 +306,40 @@ class PasswordApp:
         set_lang(self.lang_var.get())
         self._rebuild_ui()
 
+    def _on_egg_click(self, _event=None):
+        self.egg_clicks += 1
+        if self.egg_click_job:
+            self.root.after_cancel(self.egg_click_job)
+        self.egg_click_job = self.root.after(EGG_CLICK_RESET_MS, self._reset_egg_clicks)
+        if self.egg_clicks >= EGG_CLICKS:
+            self.egg_clicks = 0
+            if self.egg_click_job:
+                self.root.after_cancel(self.egg_click_job)
+                self.egg_click_job = None
+            if self.easter_game_mode:
+                self.exit_easter_game()
+            else:
+                show_pin_dialog(self)
+
+    def _reset_egg_clicks(self):
+        self.egg_clicks = 0
+        self.egg_click_job = None
+
+    def enter_easter_game(self):
+        self.easter_game_mode = True
+        if self.totp_tab:
+            self.notebook.select(self.totp_tab.frame)
+            self.totp_tab.show_game()
+
+    def exit_easter_game(self):
+        self.easter_game_mode = False
+        if self.totp_tab:
+            self.totp_tab.stop_game()
+            self.totp_tab.refresh()
+
     def _rebuild_ui(self):
         was_unlocked = self.vault_unlocked
+        was_game = self.easter_game_mode
         if hasattr(self, 'totp_tab') and self.totp_tab and self.totp_tab.refresh_id:
             self.root.after_cancel(self.totp_tab.refresh_id)
             self.totp_tab.refresh_id = None
@@ -313,6 +349,11 @@ class PasswordApp:
         self._redraw_title()
         if was_unlocked:
             self.vault_unlocked = True
+        if was_game:
+            self.easter_game_mode = True
+            if self.totp_tab:
+                self.notebook.select(self.totp_tab.frame)
+                self.totp_tab.show_game()
 
     def setup_ui(self):
         self.content = tk.Frame(self.inner, bg=W95_BG)
@@ -320,7 +361,11 @@ class PasswordApp:
 
         top_bar = tk.Frame(self.content, bg=W95_BG)
         top_bar.pack(fill=tk.X, padx=4, pady=(4, 0))
-        tk.Label(top_bar, text=tr("app_title"), font=FONT_SM, bg=W95_BG, fg=W95_SH).pack(side=tk.LEFT)
+        self.title_label = tk.Label(
+            top_bar, text=tr("app_title"), font=FONT_SM, bg=W95_BG, fg=W95_SH, cursor="hand2",
+        )
+        self.title_label.pack(side=tk.LEFT)
+        self.title_label.bind("<Button-1>", self._on_egg_click)
         lang_menu = ttk.Combobox(top_bar, textvariable=self.lang_var,
                                  values=list(SUPPORTED.keys()),
                                  state="readonly", width=6, font=FONT_SM)
