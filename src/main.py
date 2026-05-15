@@ -13,6 +13,7 @@ from .passgen import GeneratorTab
 from .savepass import VaultTab
 from .twofa import TOTPTab
 from .notepad import NotepadTab
+from .email_tab import EmailTab
 from .lang import tr, set_lang, get_lang, SUPPORTED
 
 AUTO_LOCK_MS = 120_000
@@ -289,6 +290,7 @@ class PasswordApp:
         vault_tab = VaultTab(self.notebook, self)
         totp_tab = TOTPTab(self.notebook, self)
         notes_tab = NotepadTab(self.notebook, self)
+        email_tab = EmailTab(self.notebook, self)
 
         self.vault_tab = vault_tab
         self.totp_tab = totp_tab
@@ -297,6 +299,7 @@ class PasswordApp:
         self.notebook.add(vault_tab.frame, text=f"  {tr('tab_vault')}  ")
         self.notebook.add(totp_tab.frame, text=f"  {tr('tab_2fa')}  ")
         self.notebook.add(notes_tab.frame, text=f"  {tr('tab_notes')}  ")
+        self.notebook.add(email_tab.frame, text=f"  {tr('tab_email')}  ")
 
     def startup_unlock(self):
         if self.vault_exists():
