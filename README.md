@@ -10,6 +10,9 @@ A Windows 95-styled password manager with password generation, encrypted vault s
   <img src="src/3.png" width="380">
   <img src="src/4.png" width="380">
 </p>
+<p align="center">
+  <img src="src/5.png" width="380">
+</p>
 
 ## Features
 
